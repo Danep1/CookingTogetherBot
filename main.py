@@ -3,6 +3,7 @@ from telegram.ext import Updater, MessageHandler, Filters, CallbackContext, Comm
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 import pyodbc as odbc
 import time
+from text_moderation import *
 
 TOKEN = "1181461577:AAEGd2heqoKZfE0ZJHgnlhSXvRb8_hjIruw"
 conn = odbc.connect(r'Driver={Microsoft Access Driver (*.mdb, '

@@ -10,9 +10,9 @@ def format_ingredients(text):
     for i in data.keys():
         if i in text:
             text = text.replace(i, data[i])
-    t = []
+    t = ''
     for i in text.split('!'):
-        t.append(list(map(lambda x: x.strip().capitalize(), i.split(', '))))
+        t += '\n'.join(list(map(lambda x: x.strip().capitalize(), i.split(', ')))) + '\n'
     return t
 
 
