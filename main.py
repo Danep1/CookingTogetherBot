@@ -5,14 +5,13 @@ import pyodbc as odbc
 
 TOKEN = "1181461577:AAEGd2heqoKZfE0ZJHgnlhSXvRb8_hjIruw"
 conn = odbc.connect(r'Driver={Microsoft Access Driver (*.mdb, '
-                    r'*.accdb)};DBQ=C:\Users\epikm\Downloads\kulinarnaya_kniga\Кулинарная '
-                    r'книга.mdb;')
+                    r'*.accdb)};DBQ=db\Кулинарная книга.mdb;')
+cursor = conn.cursor()
 
 
 def start(update, context):
-    keyboard = [InlineKeyboardButton("Option 1", callback_data='1'),
-                InlineKeyboardButton("Option 2", callback_data='2'),
-                InlineKeyboardButton("Option 3", callback_data='3')]
+    cursor.execute('select * from Разделы')
+    keyboard = [InlineKeyboardButton(row[0], callback_data=row[0]) for row in cursor.fetchall()]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
