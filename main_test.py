@@ -1,43 +1,48 @@
-# Импортируем необходимые классы.
-from telegram.ext import Updater, MessageHandler, Filters
-from telegram.ext import CallbackContext, CommandHandler
+from telegram.ext import Updater, MessageHandler, Filters, CallbackContext, CommandHandler, \
+    ConversationHandler
+from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove
+import time
+import requests
 
 TOKEN = "1181461577:AAEGd2heqoKZfE0ZJHgnlhSXvRb8_hjIruw"
 
 
-# Определяем функцию-обработчик сообщений.
-# У неё два параметра, сам бот и класс updater, принявший сообщение.
-def echo(update, context):
-    # У объекта класса Updater есть поле message,
-    # являющееся объектом сообщения.
-    # У message есть поле text, содержащее текст полученного сообщения,
-    # а также метод reply_text(str),
-    update.message.reply_text("Я получил сообщение " + update.message.text)
-    print("Отправил сообщение")
+def get_ll_spn(toponym):
+    ll = ','.join(toponym['Point']['pos'].split())
+    dx = str(abs(float(toponym['boundedBy']['Envelope']['upperCorner'].split()[0])
+             - float(toponym['boundedBy']['Envelope']['lowerCorner'].split()[0])))
+    dy = str(abs(float(toponym['boundedBy']['Envelope']['upperCorner'].split()[1])
+             - float(toponym['boundedBy']['Envelope']['lowerCorner'].split()[1])))
+    print("Получил ll и spn")
+    return ll, dx + ',' + dy
 
+
+def geocoder(update, context):
+    geocoder_uri = geocoder_request_template = "http://geocode-maps.yandex.ru/1.x/"
+    response = requests.get(geocoder_uri, params={
+        "apikey": "40d1649f-0493-4b70-98ba-98533de7710b",
+        "format": "json",
+        "geocode": update.message.text
+    })
+
+    toponym = response.json()["response"]["GeoObjectCollection"]["featureMember"][0]["GeoObject"]
+    print("Обрабатываю...")
+    ll, spn = get_ll_spn(toponym)
+    print("Получил ll и spn")
+    static_api_request = f"http://static-maps.yandex.ru/1.x/?ll={ll}&spn={spn}&l=map"
+    print('Sending Photo')
+    context.bot.send_photo(update.message.chat_id, static_api_request, caption="Нашёл:")
+    print('Sent Photo')
 
 def main():
-    # Создаём объект updater.
-    # Вместо слова "TOKEN" надо разместить полученный от @BotFather токен
     updater = Updater(TOKEN, use_context=True)
 
     # Получаем из него диспетчер сообщений.
     dp = updater.dispatcher
+    dp.add_handler(CommandHandler("geo", geocoder))
 
-    # Создаём обработчик сообщений типа Filters.text
-    # из описанной выше функции echo()
-    # После регистрации обработчика в диспетчере
-    # эта функция будет вызываться при получении сообщения
-    # с типом "текст", т. е. текстовых сообщений.
-    text_handler = MessageHandler(Filters.text, echo)
-
-    # Регистрируем обработчик в диспетчере.
-    dp.add_handler(text_handler)
-    # Запускаем цикл приема и обработки сообщений.
     updater.start_polling()
-
-    # Ждём завершения приложения.
-    # (например, получения сигнала SIG_TERM при нажатии клавиш Ctrl+C)
+    print('Принимаем сообщение')
     updater.idle()
 
 
