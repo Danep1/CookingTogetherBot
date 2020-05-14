@@ -1,7 +1,7 @@
 from telegram.ext import Updater, MessageHandler, Filters, CallbackContext, CommandHandler, \
     CallbackQueryHandler, ConversationHandler
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-import pyodbc as odbc
+import sqlite3 as sql
 import time
 from text_moderation import *
 import logging
@@ -9,9 +9,8 @@ import logging
 # ТОКЕН бота в телеграмме @CookingTogetherBot
 TOKEN = "1181461577:AAEGd2heqoKZfE0ZJHgnlhSXvRb8_hjIruw"
 
-# Подключение базы данных MS Access с рецептами
-''' Требуется драйвер MS Access Engine 64x !!! '''
-conn = odbc.connect(r'Driver={Microsoft Access Driver (*.mdb, *.accdb)};DBQ=db\CookingBook.mdb;')
+# Подключение базы данных SQLite3 с рецептами
+conn = sql.connect("db/CookingBook.sqlite")
 cursor = conn.cursor()
 # Создание оперативного массива с категориями из базы данных
 cursor.execute('select name from Category')
