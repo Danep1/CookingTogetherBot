@@ -4,7 +4,7 @@ def format_ingredients(text):
             'ч.лож.': 'чайные ложки',
             '1/2 ст.лож.': 'половина столовой ложки',
             '1 ст.лож.': 'столовая ложка',
-            'ст.лож.': 'столовые ложеки',
+            'ст.лож.': 'столовые ложки',
             '1/2': 'половина',
             'гр.': 'г', ' -': ' - ', '.': ''}
     for i in data.keys():
@@ -21,4 +21,4 @@ def format_name(text):
     if '*' in text:
         c = text.count('*')
         text = text.replace('*' * c, ' - Версия ' + str(c))
-    print(text)
+    return text

@@ -1,20 +1,30 @@
 from telegram.ext import Updater, MessageHandler, Filters, CallbackContext, CommandHandler, \
     CallbackQueryHandler, ConversationHandler
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Bot
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 import pyodbc as odbc
 import time
 from text_moderation import *
 import logging
 
+# ТОКЕН бота в телеграмме @CookingTogetherBot
 TOKEN = "1181461577:AAEGd2heqoKZfE0ZJHgnlhSXvRb8_hjIruw"
+
+# Подключение базы данных MS Access с рецептами
+''' Требуется драйвер MS Access Engine 64x !!! '''
 conn = odbc.connect(r'Driver={Microsoft Access Driver (*.mdb, *.accdb)};DBQ=db\CookingBook.mdb;')
 cursor = conn.cursor()
-cursor.execute('select * from Category')
-categories = cursor.fetchall()
+# Создание оперативного массива с категориями из базы данных
+cursor.execute('select name from Category')
+categories = [i[0] for i in cursor.fetchall()]
+
+# Настройка и инициализация логов для отлаживания и контроля программы
+# Выводит время и дату события с описанием
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
 logger = logging.getLogger(__name__)
-data = []
+
+# Оперативный массив для рецептов из категорий
+data_from_db, actual_message_id = [], 0
 # Stages
 FIRST, SECOND = range(2)
 # Callback data
@@ -23,48 +33,85 @@ ONE, TWO, THREE, FOUR = range(4)
 
 def start(update, context):
     logger.info("User %s started the conversation.", update.message.from_user.first_name)
-    keyboard = [[InlineKeyboardButton(row[1], callback_data=row[0])] for row in categories]
+
+    keyboard = [[InlineKeyboardButton(categories[i], callback_data=i)]
+                for i in range(len(categories))]
     reply_markup = InlineKeyboardMarkup(keyboard)
+
     update.message.reply_text('Выберите категорию рецептов:', reply_markup=reply_markup)
+
+    logging.info("Sent to @%s Message of '/start' state.", update.message.from_user.first_name)
     return FIRST
 
 
 def start_over(update, context):
     query = update.callback_query
+    # logger.info("Waiting user's answer...", update.message.from_user.first_name)
     query.answer()
-    logger.info("User %s restarted the conversation.", update.message.from_user.first_name)
-    keyboard = [[InlineKeyboardButton(row[1], callback_data=row[0])] for row in categories]
+    # logger.info("User %s restarted the conversation.", update.message.from_user.first_name)
+
+    keyboard = [[InlineKeyboardButton(categories[i], callback_data=i)]
+                for i in range(len(categories))]
     reply_markup = InlineKeyboardMarkup(keyboard)
+
     query.edit_message_text(text='Выберите категорию рецептов:', reply_markup=reply_markup)
+    logging.info("Edited @%s Message '/start' state: @", query.from_user.first_name)
+
     return FIRST
 
 
 def one(update, context):
+    global data_from_db, actual_message_id
     query = update.callback_query
-    query.answer()
-    print('Получил ответ\t' + time.asctime())
+    logger.info("Waiting @%s's answer...", query.from_user.first_name)
 
-    keyboard = [InlineKeyboardButton('Выбрать другую категорию', callback_data='1')]
+    query.answer()
+    logger.info("Got answer from @%s '{}'".format(query.data), query.from_user.first_name)
+
+    keyboard = [[InlineKeyboardButton('Выбрать другую  категорию', callback_data='1')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
     cursor.execute('select name from Book where id_category={}'.format(query.data))
-    data = cursor.fetchall()
-    text = 'Вот список блюд в категории {}'.format(categories[int(query.data)])
-    for pos in range(len(data)):
-        text = text + f'\n{pos}) {data[pos]}'
-    text = text + f'\nНапишите в чат номер нужного рецепта'
-    query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(keyboard))
+    data_from_db = cursor.fetchall()
+
+    text = 'Вот список блюд в категории {}'.format(categories[int(query.data)][1])
+    for pos in range(len(data_from_db)):
+        text = text + f'\n{pos + 1}) {data_from_db[pos][0].strip()}'
+    text = text + f'\nНапишите в чат номер нужного рецепта или выберите другую категорию.'
+
+    actual_message_id = query.message.message_id
+    query.bot.edit_message_text(text, chat_id=query.message.chat_id,
+                                message_id=query.message.message_id,
+                                reply_markup=reply_markup)
+    logging.info("Edited @%s Message FIRST state: @", query.from_user.first_name)
     return SECOND
 
 
 def get_receipt_number(update, context):
-    receipt = int(update.message.text)
-    cursor.execute('select name, ingredients, cooking, photo from Book where name=?', data[receipt])
-    name, ingredients, cooking, photo = cursor.fetchall()
-    name, ingredients = format_name(name), format_ingredients(ingredients)
+    global data_from_db, actual_message_id
+    receipt = update.message.text
+
+    cursor.execute('select name, ingredients, cooking, image_url from Book where name=?',
+                   data_from_db[int(receipt) - 1])
+    data_from_db = cursor.fetchall()[0]
+    name, ingredients, cooking, image_url = data_from_db
+    name, ingredients = format_name(name), format_ingredients(ingredients).strip()
+
     cap = f"{name}\n" \
         f"СОСТАВ: {ingredients}" \
         f"Приготовление:{cooking}"
-    update.edit_message_text(text='Приятного аппетита!!!', reply_markup=None)
-    context.bot.send_photo(update.message.chat_id, photo, caption=cap)
+
+    context.bot.edit_message_text(text='Приятного аппетита!!!',
+                                  chat_id=update.message.chat_id,
+                                  message_id=actual_message_id,
+                                  reply_markup=None)
+
+    if image_url:
+        context.bot.send_photo(update.message.chat_id, image_url, caption=cap)
+        logging.info("Sent to @%s a Photo FIRST state: @", update.message.from_user.first_name)
+    else:
+        context.bot.send_message(update.message.chat_id, text=cap)
+        logging.info("Sent to @%s a Message FIRST state: @", update.message.from_user.first_name)
     return ConversationHandler.END
 
 
@@ -84,14 +131,14 @@ def main():
     dp = updater.dispatcher
     dp.add_handler(CommandHandler("help", help))
     dp.add_handler(ConversationHandler(
-            entry_points=[CommandHandler('start', start)],
-            states={
-                FIRST: [CallbackQueryHandler(one)],
-                SECOND: [CallbackQueryHandler(start_over),
-                         MessageHandler(Filters.text, get_receipt_number)]
-            },
-            fallbacks=[CommandHandler('start', start)]
-        )
+        entry_points=[CommandHandler('start', start)],
+        states={
+            FIRST: [CallbackQueryHandler(one)],
+            SECOND: [CallbackQueryHandler(start_over),
+                     MessageHandler(Filters.text, get_receipt_number)]
+        },
+        fallbacks=[CommandHandler('start', start)]
+    )
     )
 
     dp.add_error_handler(error)
