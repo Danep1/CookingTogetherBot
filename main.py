@@ -1,4 +1,4 @@
-from telegram.ext import Updater, MessageHandler, Filters, CallbackContext, CommandHandler, \
+from telegram.ext import Updater, MessageHandler, Filters, CommandHandler, \
     CallbackQueryHandler, ConversationHandler
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 import sqlite3 as sql
@@ -7,11 +7,12 @@ from text_moderation import *
 import logging
 
 # ТОКЕН бота в телеграмме @CookingTogetherBot
-TOKEN = "1181461577:AAEGd2heqoKZfE0ZJHgnlhSXvRb8_hjIruw"
+TOKEN = "1147988782:AAFbcmCE96UICmS3_yrYGXLqQ1FjyjNkZCg"
 
 # Подключение базы данных SQLite3 с рецептами
-conn = sql.connect("db/CookingBook.sqlite")
+conn = sql.connect("db/CookingBook.sqlite", check_same_thread=False)
 cursor = conn.cursor()
+
 # Создание оперативного массива с категориями из базы данных
 cursor.execute('select name from Category')
 categories = [i[0] for i in cursor.fetchall()]
@@ -70,10 +71,10 @@ def one(update, context):
     keyboard = [[InlineKeyboardButton('Выбрать другую  категорию', callback_data='1')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    cursor.execute('select name from Book where id_category={}'.format(query.data))
+    cursor.execute("select name from Book where id_category='{}'".format(query.data))
     data_from_db = cursor.fetchall()
 
-    text = 'Вот список блюд в категории {}'.format(categories[int(query.data)][1])
+    text = 'Вот список блюд в категории {}'.format(categories[int(query.data)])
     for pos in range(len(data_from_db)):
         text = text + f'\n{pos + 1}) {data_from_db[pos][0].strip()}'
     text = text + f'\nНапишите в чат номер нужного рецепта или выберите другую категорию.'
@@ -82,28 +83,34 @@ def one(update, context):
     query.bot.edit_message_text(text, chat_id=query.message.chat_id,
                                 message_id=query.message.message_id,
                                 reply_markup=reply_markup)
-    logging.info("Edited @%s Message FIRST state: @", query.from_user.first_name)
+    logging.info("Edited @%s Message FIRST state.", query.from_user.first_name)
     return SECOND
 
 
 def get_receipt_number(update, context):
     global data_from_db, actual_message_id
     receipt = update.message.text
+    logger.info("Got Message '{}' from @%s ".format(receipt), update.message.from_user.first_name)
 
-    cursor.execute('select name, ingredients, cooking, image_url from Book where name=?',
+    cursor.execute("select name, ingredients, cooking, image_url from Book where name=?",
                    data_from_db[int(receipt) - 1])
     data_from_db = cursor.fetchall()[0]
     name, ingredients, cooking, image_url = data_from_db
     name, ingredients = format_name(name), format_ingredients(ingredients).strip()
 
     cap = f"{name}\n" \
-        f"СОСТАВ: {ingredients}" \
-        f"Приготовление:{cooking}"
+        f"СОСТАВ:\n{ingredients}\n" \
+        f"ПРИГОТОВЛЕНИЕ:\n{cooking}"
 
-    context.bot.edit_message_text(text='Приятного аппетита!!!',
-                                  chat_id=update.message.chat_id,
-                                  message_id=actual_message_id,
-                                  reply_markup=None)
+    # context.bot.edit_message_text(text="Приятного аппетита!",
+    #                               chat_id=update.message.chat_id,
+    #                               message_id=actual_message_id,
+    #                               reply_markup=None,
+    #                               )
+    # logging.info("Edited @%s Message SECOND state.", update.message.from_user.first_name)
+
+    context.bot.delete_message(update.message.chat_id, actual_message_id)
+    logging.info("Deleted @%s Message SECOND state.", update.message.from_user.first_name)
 
     if image_url:
         context.bot.send_photo(update.message.chat_id, image_url, caption=cap)

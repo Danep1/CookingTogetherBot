@@ -1,9 +1,8 @@
-import pyodbc as odbc
+import sqlite3 as sql
 
-conn = odbc.connect(r'Driver={Microsoft Access Driver (*.mdb, '
-                    r'*.accdb)};DBQ=db\Кулинарная книга2.mdb;')
+conn = sql.connect("db/CookingBook.sqlite")
 cursor = conn.cursor()
-cursor.execute('select cooking from Книга where id_1=1')
+cursor.execute("select cooking from Book where id_1='1'")
 
 for row in cursor.fetchall():
     print(row)
