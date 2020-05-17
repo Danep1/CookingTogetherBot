@@ -2,7 +2,6 @@ from telegram.ext import Updater, MessageHandler, Filters, CommandHandler, \
     CallbackQueryHandler, ConversationHandler
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 import sqlite3 as sql
-import time
 from text_moderation import *
 import logging
 
@@ -55,7 +54,7 @@ def start_over(update, context):
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     query.edit_message_text(text='Выберите категорию рецептов:', reply_markup=reply_markup)
-    logging.info("Edited @%s Message '/start' state: @", query.from_user.first_name)
+    logging.info("Edited @%s Message '/start' state.", query.from_user.first_name)
 
     return FIRST
 
@@ -66,7 +65,7 @@ def one(update, context):
     logger.info("Waiting @%s's answer...", query.from_user.first_name)
 
     query.answer()
-    logger.info("Got answer from @%s '{}'".format(query.data), query.from_user.first_name)
+    logger.info("Got answer from @%s: '{}'.".format(query.data), query.from_user.first_name)
 
     keyboard = [[InlineKeyboardButton('Выбрать другую  категорию', callback_data='1')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -90,7 +89,7 @@ def one(update, context):
 def get_receipt_number(update, context):
     global data_from_db, actual_message_id
     receipt = update.message.text
-    logger.info("Got Message '{}' from @%s ".format(receipt), update.message.from_user.first_name)
+    logger.info("Got Message '{}' from @%s.".format(receipt), update.message.from_user.first_name)
 
     cursor.execute("select name, ingredients, cooking, image_url from Book where name=?",
                    data_from_db[int(receipt) - 1])
@@ -113,17 +112,29 @@ def get_receipt_number(update, context):
     logging.info("Deleted @%s Message SECOND state.", update.message.from_user.first_name)
 
     if image_url:
+        #  Отправляем фото, если оно есть в базе данных
         context.bot.send_photo(update.message.chat_id, image_url, caption=cap)
-        logging.info("Sent to @%s a Photo FIRST state: @", update.message.from_user.first_name)
+        logging.info("Sent to @%s a Photo FIRST state.", update.message.from_user.first_name)
     else:
+        #  Отправляем сооющение, если фото нет в базе данных
         context.bot.send_message(update.message.chat_id, text=cap)
-        logging.info("Sent to @%s a Message FIRST state: @", update.message.from_user.first_name)
+        logging.info("Sent to @%s a Message FIRST state.", update.message.from_user.first_name)
     return ConversationHandler.END
 
 
 def help(update, context):
-    print('/help\t' + time.asctime())
-    update.message.reply_text("Я пока не умею помогать... Я только ваше эхо.")
+    """Send info about Telegram bot"""
+    logging.info("Sent to @%s a '/help' Message.", update.message.from_user.first_name)
+    update.message.reply_text("Это Telegram Бот, который поможет тебе найти нужный рецепт,"
+                              "узнать точное количество ингредиентов, которое понадобится для "
+                              "определённого рецепта, что очень удобно, так как ты будешь сразу "
+                              "знать, сможешь ли ты уже сейчас воплотить в жизнь ту или иную идею."
+                              "Также есть подробное описание самого процесса приготовления,"
+                              "его иногда не хватает в некоторых ботах.\n"
+                              "Как же им пользоваться?\n"
+                              "Очень просто! Напишите боту /start и высветится главное меню с "
+                              "10 разнообразными категориями. Выбрав нужную категорию, напишите в "
+                              "чат номер нужного вам рецепта из появившегося списка.")
 
 
 def error(update, context):
